@@ -448,16 +448,8 @@ if modo == "Cotizar compra":
         if submarca_sel != "(elige una)":
             df_submarca = df_submarca[df_submarca["SUBMARCA"] == submarca_sel]
 
-        # 3) Versión
-        versiones = sorted(df_submarca["VERSIÓN"].dropna().astype(str).unique())
-        version_sel = st.selectbox("Versión", ["(elige una)"] + versiones)
-
-        df_version = df_submarca.copy()
-        if version_sel != "(elige una)":
-            df_version = df_version[df_version["VERSIÓN"] == version_sel]
-
-        # 4) Año / Modelo
-        anios_raw = df_version["AÑO/MODELO"].dropna().unique()
+        # 3) Año / Modelo (filtra por Marca + Submarca)
+        anios_raw = df_submarca["AÑO/MODELO"].dropna().unique()
         anios = []
         for a in anios_raw:
             try:
@@ -467,8 +459,25 @@ if modo == "Cotizar compra":
             except:
                 pass
         anios = sorted(list(set(anios)))
-
         anio_sel = st.selectbox("Año / Modelo", ["(elige uno)"] + anios)
+
+        df_anio = df_submarca.copy()
+        if anio_sel != "(elige uno)":
+            def normalizar_anio(x):
+                try:
+                    if pd.notna(x):
+                        return str(int(float(x)))
+                except:
+                    return ""
+                return ""
+
+            df_anio = df_anio.copy()
+            df_anio["ANIO_STR"] = df_anio["AÑO/MODELO"].apply(normalizar_anio)
+            df_anio = df_anio[df_anio["ANIO_STR"] == anio_sel]
+
+        # 4) Versión (solo las de ese año)
+        versiones = sorted(df_anio["VERSIÓN"].dropna().astype(str).unique()) if not df_anio.empty else []
+        version_sel = st.selectbox("Versión", ["(elige una)"] + versiones)
 
         ver_navegador = st.checkbox("Ver navegador (MercadoLibre)", value=True)
 
@@ -476,10 +485,10 @@ if modo == "Cotizar compra":
             if (
                 marca_sel == "(elige una)"
                 or submarca_sel == "(elige una)"
-                or version_sel == "(elige una)"
                 or anio_sel == "(elige uno)"
+                or version_sel == "(elige una)"
             ):
-                st.warning("Completa Marca, Submarca, Versión y Año para cotizar.")
+                st.warning("Completa Marca, Submarca, Año y Versión para cotizar.")
             else:
                 # 1) Fila exacta de AUTOPRECIOS
                 df_match = df_autoprecios.copy()
@@ -502,7 +511,7 @@ if modo == "Cotizar compra":
                 ]
 
                 if df_match.empty:
-                    st.error("No encontré en AUTOPRECIOS una fila que coincida exactamente con Marca/Submarca/Versión/Año seleccionados.")
+                    st.error("No encontré en AUTOPRECIOS una fila que coincida exactamente con Marca/Submarca/Año/Versión seleccionados.")
                     st.stop()
 
                 fila = df_match.iloc[0]
@@ -530,13 +539,12 @@ if modo == "Cotizar compra":
                     compra_sugerida = int(sugerido * 0.88) if sugerido > 0 else 0
                     utilidad_vs_compra_cat = sugerido - precio_compra_cat if (sugerido and precio_compra_cat) else 0
 
-                    # Bloque 1: Configuración y catálogo
                     st.subheader("Configuración seleccionada")
                     st.write(f"**ID Autoprecios**: {id_auto}")
                     st.write(f"**Marca**: {marca_sel}")
                     st.write(f"**Submarca / Modelo**: {submarca_sel}")
-                    st.write(f"**Versión**: {version_sel}")
                     st.write(f"**Año / Modelo**: {anio_sel}")
+                    st.write(f"**Versión**: {version_sel}")
 
                     st.write("---")
                     st.subheader("Valores de catálogo AUTOPRECIOS")
@@ -546,7 +554,6 @@ if modo == "Cotizar compra":
                     st.write(f"**Precio intermedio**: {precio_intermedio:,.0f} MXN")
                     st.write(f"**Precio agencia certificados**: {precio_ag_cert:,.0f} MXN")
 
-                    # Bloque 2: Resultados del robot
                     st.write("---")
                     st.subheader("Resultados MercadoLibre (Robot Daytona)")
                     st.write(f"**Autos comparables encontrados**: {num}")
@@ -554,7 +561,6 @@ if modo == "Cotizar compra":
                     if url:
                         st.write("Link usado para la búsqueda:", url)
 
-                    # Bloque 3: Fichas visuales
                     st.write("---")
                     st.subheader("Precios sugeridos Daytona")
 
@@ -568,7 +574,6 @@ if modo == "Cotizar compra":
                         f"{compra_sugerida:,.0f} MXN"
                     )
 
-                    # Bloque 4: Utilidad contra catálogo
                     st.write("---")
                     st.subheader("Análisis rápido")
                     st.write(
